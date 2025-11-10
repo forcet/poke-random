@@ -77,9 +77,9 @@ configMap:
   data: 
     APP_PORT: 3000
     SERVICE_URL: https://pokeapi.co/api/v2/pokemon/
-    SERVICE_DATA_URL: http://forcet-poke-data.forcet22-dev.svc.cluster.local:3001/data/
-    SERVICE_ALL_DATA_URL: http://forcet-poke-data.forcet22-dev.svc.cluster.local:3001/getData
-    SERVICE_SAVE_DATA_URL: http://forcet-poke-data.forcet22-dev.svc.cluster.local:3001/createData
+    SERVICE_DATA_URL: http://forcet-poke-data.forcet22-dev.svc.cluster.local:3000/data/
+    SERVICE_ALL_DATA_URL: http://forcet-poke-data.forcet22-dev.svc.cluster.local:3000/getData
+    SERVICE_SAVE_DATA_URL: http://forcet-poke-data.forcet22-dev.svc.cluster.local:3000/createData
     MAX_RANDOM_VALUE: 700
 
 secret:
