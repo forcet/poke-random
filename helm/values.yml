@@ -101,10 +101,10 @@ networkPolicy:
   allowDnsEgress: true
 
 route:
-  enabled: false
-  host: ""          
+  enabled: true
+  host: forcet-poke-api-forcet22-dev.apps.rm2.thpm.p1.openshiftapps.com         
   serviceName: ""   
-  targetPort: ""
+  targetPort: 3000
   tls:
     enabled: true
     termination: edge
