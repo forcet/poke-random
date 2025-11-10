@@ -126,5 +126,5 @@ jobs:
           cat helm/values.yml
       - name: Deploy files
         run: |
-          helm show chart oci://registry-1.docker.io/${{ secrets.DOCKER_USERNAME  }}/helm-template --version 7
-          helm upgrade --install forcet-poke-api oci://registry-1.docker.io/${{ secrets.DOCKER_USERNAME  }}/helm-template --version 7 --values helm/values.yml
+          helm show chart oci://registry-1.docker.io/${{ secrets.DOCKER_USERNAME  }}/helm-template --version 8
+          helm upgrade --install forcet-poke-api oci://registry-1.docker.io/${{ secrets.DOCKER_USERNAME  }}/helm-template --version 8 --values helm/values.yml
