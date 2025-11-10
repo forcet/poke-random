@@ -1,0 +1,130 @@
+name: Docker image poke-random CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+    outputs:
+      pkg-name: ${{ steps.pkg.outputs.name }}
+      pkg-version: ${{ steps.pkg.outputs.version }}
+
+    steps:
+      # 1. Clona tu repositorio en la máquina virtual
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Detectar cambios que requieren nueva imagen
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            build_image:
+              - 'src/**'
+              - 'Dockerfile'
+              - 'package.json'
+              - 'package-lock.json'
+
+      - name: Mostrar decisión de build
+        run: echo "¿Construir imagen? -> ${{ steps.changes.outputs.build_image }}"
+
+      - name: Read metadata from package.json
+        id: pkg
+        run: |
+          echo "name=$(jq -r .name package.json)" >> $GITHUB_OUTPUT
+          echo "version=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
+
+      - name: Log in to Docker Hub
+        if: steps.changes.outputs.build_image == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME  }}
+          password: ${{ secrets.DOCKERHUB_TOKEN  }}
+
+      - name: Extract metadata for Docker
+        if: steps.changes.outputs.build_image == 'true'
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKER_USERNAME  }}/${{ steps.pkg.outputs.name }}
+          tags: |
+              type=raw,value=${{ steps.pkg.outputs.version }}
+              type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build Docker image
+        if: steps.changes.outputs.build_image == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Show image info
+        run: |
+          echo "Image name: ${{ secrets.DOCKER_USERNAME }}/${{ needs.build.outputs.pkg-name }}"
+          echo "Version: ${{ needs.build.outputs.pkg-version }}"
+          
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install OC CLI
+        run: |
+          curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar xz
+          sudo mv oc /usr/local/bin/
+          oc version
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.12.0
+      - name: Verificar secreto OPENSHIFT_TOKEN sin exponerlo
+        env:
+          OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
+        run: |
+          if [ -z "$OPENSHIFT_TOKEN" ]; then
+            echo "ERROR: OPENSHIFT_TOKEN no está definido o está vacío."
+            exit 1
+          fi
+          echo "::add-mask::$OPENSHIFT_TOKEN"  # asegura que se oculte si se imprime por error
+          echo "Longitud del token: ${#OPENSHIFT_TOKEN} caracteres"
+          echo -n "$OPENSHIFT_TOKEN" | sha256sum | awk '{print "sha256(token) = "$1}'
+      
+      - name: Saneando token (quitar CR/LF) y exportando a entorno
+        env:
+          RAW_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
+        run: |
+          CLEAN_TOKEN="$(printf '%s' "$RAW_TOKEN" | tr -d '\r\n')"
+          echo "OPENSHIFT_TOKEN_STRIPPED=$CLEAN_TOKEN" >> $GITHUB_ENV
+          echo "::add-mask::$CLEAN_TOKEN"
+          echo "Longitud saneada: ${#CLEAN_TOKEN}"
+      - name: Log in Openshift
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: https://api.rm2.thpm.p1.openshiftapps.com:6443
+          openshift_token: ${{ env.OPENSHIFT_TOKEN_STRIPPED }} 
+          namespace: forcet22-dev
+      - name: Update Deployment tag
+        run: |
+          echo "Reemplazando {{ tag }} con ${{ needs.build.outputs.pkg-version }}"
+          sed -i "s|{{ tag }}|${{ needs.build.outputs.pkg-version }}|g"  helm/values.yml
+          echo "Reemplazando {{ repository }} con ${{ needs.build.outputs.pkg-version }}"
+          sed -i "s|{{ repository }}|${{ secrets.DOCKER_USERNAME }}/${{ needs.build.outputs.pkg-name }}|g"  helm/values.yml
+          cat helm/values.yml
+      - name: Deploy files
+        run: |
+          helm show chart oci://registry-1.docker.io/${{ secrets.DOCKER_USERNAME  }}/helm-template --version 7
+          helm upgrade --install forcet-poke-api oci://registry-1.docker.io/${{ secrets.DOCKER_USERNAME  }}/helm-template --version 7 --values helm/values.yml

@@ -1,0 +1,110 @@
+name: forcet-poke-api
+
+namespace: forcet22-dev
+
+labels:
+  app: forcet-poke-api
+
+workload:
+  type: Deployment 
+  replicas: 2
+  storageSize: 20Gi
+
+persistence:
+  enabled: false
+
+replicaCount: 2
+
+service:
+  enabled: true
+  type: ClusterIP    
+  port: 3000
+  targetPort: 3000
+  headless: true
+  protocol: TCP
+
+container:
+  port: 3000
+  failureThreshold: 5
+  initialDelaySeconds: 0
+  periodSeconds: 10
+
+image:
+  repository: {{ repository }}
+  tag: {{ tag }}
+  pullPolicy: IfNotPresent
+
+resources:
+  request:
+    cpu: "500m"
+    memory: "800Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1500Mi"
+
+probes:
+  startup:
+    type: httpGet
+    enabled: true
+    path: /startup
+    port: 3000      
+    periodSeconds: 10
+    failureThreshold: 30
+
+  readiness:
+    type: httpGet
+    enabled: true
+    path: /readiness
+    port: 3000
+    periodSeconds: 10
+    failureThreshold: 3
+
+  liveness:
+    type: httpGet
+    enabled: true
+    path: /health
+    port: 3000
+    periodSeconds: 10
+    failureThreshold: 3
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+configMap:
+  data: 
+    APP_PORT: 3000
+    SERVICE_URL: https://pokeapi.co/api/v2/pokemon/
+    SERVICE_DATA_URL: http://forcet-poke-data.forcet22-dev.svc.cluster.local:3001/data/
+    SERVICE_ALL_DATA_URL: http://forcet-poke-data.forcet22-dev.svc.cluster.local:3001/getData
+    SERVICE_SAVE_DATA_URL: http://forcet-poke-data.forcet22-dev.svc.cluster.local:3001/createData
+    MAX_RANDOM_VALUE: 700
+
+secret:
+  enabled: false
+  data: {}
+
+networkPolicy:
+  enabled: true
+  port: 3000 
+  ingressFromApps:
+    - forcet-poke-frontend
+  egressTo: 
+    - app: forcet-poke-data
+      port: 3000
+  allowInternetEgress: false
+  defaultDeny:
+    enabled: false
+  allowDnsEgress: true
+
+route:
+  enabled: false
+  host: ""          
+  serviceName: ""   
+  targetPort: ""
+  tls:
+    enabled: true
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
