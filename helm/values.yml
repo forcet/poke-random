@@ -89,7 +89,7 @@ secret:
 networkPolicy:
   enabled: true
   port: 3000 
-  allowIngressFromRouter: false 
+  allowIngressFromRouter: true 
   ingressFromApps:
     - forcet-poke-frontend
   egressTo: 
