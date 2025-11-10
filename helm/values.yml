@@ -7,13 +7,13 @@ labels:
 
 workload:
   type: Deployment 
-  replicas: 2
+  replicas: 1
   storageSize: 20Gi
 
 persistence:
   enabled: false
 
-replicaCount: 2
+replicaCount: 1
 
 service:
   enabled: true
@@ -89,12 +89,13 @@ secret:
 networkPolicy:
   enabled: true
   port: 3000 
+  allowIngressFromRouter: false 
   ingressFromApps:
     - forcet-poke-frontend
   egressTo: 
     - app: forcet-poke-data
       port: 3000
-  allowInternetEgress: false
+  allowInternetEgress: true
   defaultDeny:
     enabled: false
   allowDnsEgress: true
