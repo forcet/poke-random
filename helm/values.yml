@@ -102,9 +102,9 @@ networkPolicy:
 
 route:
   enabled: true
-  host: forcet-poke-api-forcet22-dev.apps.rm2.thpm.p1.openshiftapps.com         
+  host: ""       
   serviceName: ""   
-  targetPort: 3000
+  targetPort: http
   tls:
     enabled: true
     termination: edge
