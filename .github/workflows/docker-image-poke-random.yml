@@ -71,60 +71,12 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Show image info
-        run: |
-          echo "Image name: ${{ secrets.DOCKER_USERNAME }}/${{ needs.build.outputs.pkg-name }}"
-          echo "Version: ${{ needs.build.outputs.pkg-version }}"
-          
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install OC CLI
-        run: |
-          curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar xz
-          sudo mv oc /usr/local/bin/
-          oc version
-      - name: Install Helm
-        uses: azure/setup-helm@v3
-        with:
-          version: v3.12.0
-      - name: Verificar secreto OPENSHIFT_TOKEN sin exponerlo
-        env:
-          OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
-        run: |
-          if [ -z "$OPENSHIFT_TOKEN" ]; then
-            echo "ERROR: OPENSHIFT_TOKEN no está definido o está vacío."
-            exit 1
-          fi
-          echo "::add-mask::$OPENSHIFT_TOKEN"  # asegura que se oculte si se imprime por error
-          echo "Longitud del token: ${#OPENSHIFT_TOKEN} caracteres"
-          echo -n "$OPENSHIFT_TOKEN" | sha256sum | awk '{print "sha256(token) = "$1}'
-      
-      - name: Saneando token (quitar CR/LF) y exportando a entorno
-        env:
-          RAW_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
-        run: |
-          CLEAN_TOKEN="$(printf '%s' "$RAW_TOKEN" | tr -d '\r\n')"
-          echo "OPENSHIFT_TOKEN_STRIPPED=$CLEAN_TOKEN" >> $GITHUB_ENV
-          echo "::add-mask::$CLEAN_TOKEN"
-          echo "Longitud saneada: ${#CLEAN_TOKEN}"
-      - name: Log in Openshift
-        uses: redhat-actions/oc-login@v1
-        with:
-          openshift_server_url: https://api.rm2.thpm.p1.openshiftapps.com:6443
-          openshift_token: ${{ env.OPENSHIFT_TOKEN_STRIPPED }} 
-          namespace: forcet22-dev
-      - name: Update Deployment tag
-        run: |
-          echo "Reemplazando {{ tag }} con ${{ needs.build.outputs.pkg-version }}"
-          sed -i "s|{{ tag }}|${{ needs.build.outputs.pkg-version }}|g"  helm/values.yml
-          echo "Reemplazando {{ repository }} con ${{ needs.build.outputs.pkg-version }}"
-          sed -i "s|{{ repository }}|${{ secrets.DOCKER_USERNAME }}/${{ needs.build.outputs.pkg-name }}|g"  helm/values.yml
-          cat helm/values.yml
-      - name: Deploy files
-        run: |
-          helm show chart oci://registry-1.docker.io/${{ secrets.DOCKER_USERNAME  }}/helm-template --version 8
-          helm upgrade --install forcet-poke-api oci://registry-1.docker.io/${{ secrets.DOCKER_USERNAME  }}/helm-template --version 8 --values helm/values.yml
+    uses: forcet/devop-template/.github/workflows/docker-image-devop-template.yml@main
+    with:
+      helm_name: helm-template
+      helm_release: forcet-poke-api
+      helm_version: 8
+      image_repository: ${{ needs.build.outputs.pkg-name }}
+      image_tag: ${{ needs.build.outputs.pkg-version }}
+      namespace: forcet22-dev
+    secrets: inherit
